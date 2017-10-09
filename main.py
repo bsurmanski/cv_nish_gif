@@ -11,6 +11,15 @@ parser.add_argument('--input', '-i',
 parser.add_argument('--output', '-o',
 					default='out.gif',
 					help='output gif file')
+parser.add_argument('--height', '-y',
+					default=800, type=int,
+					help='scaled height of the output image.')
+parser.add_argument('--num_frames', '-n',
+					default=4, type=int,
+					help='Number of frames in the Nishika picture.')
+parser.add_argument('--boomerang', '-z',
+					default=True, type=bool,
+					help='Whether the gif should boomerang back-and-forth.')
 
 POI = []
 
@@ -119,13 +128,16 @@ def outputToGif(filename, frames, boomerang=True):
                     duration=0.1)
 
 def main():
-	args = parser.parse_args()
-	print args.input, args.output
-	return
-    src = cv2.imread(args.input, cv2.IMREAD_UNCHANGED)
-    frames = sliceAndAlignImages(src, 4)
-    outputToGif(args.output, frames)
-    cv2.destroyAllWindows()
+  args = parser.parse_args()
+  src = cv2.imread(args.input, cv2.IMREAD_UNCHANGED)
+  h, w = src.shape[0:2]
+  target_height = args.height or h
+  scale = float(args.height) / h
+  scaled = cv2.resize(src, (int(w * scale), target_height),
+                      None, interpolation=cv2.INTER_CUBIC)
+  frames = sliceAndAlignImages(scaled, args.num_frames)
+  outputToGif(args.output, frames, boomerang=args.boomerang)
+  cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':

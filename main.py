@@ -1,7 +1,16 @@
+import argparse
 import cv2
 import numpy as np
 import imageio
 from matplotlib import pyplot as plt
+
+parser = argparse.ArgumentParser(description='process Nishika Photos')
+parser.add_argument('--input', '-i',
+					default='in.jpg',
+					help='input file containing Nishika pictures')
+parser.add_argument('--output', '-o',
+					default='out.gif',
+					help='output gif file')
 
 POI = []
 
@@ -110,9 +119,12 @@ def outputToGif(filename, frames, boomerang=True):
                     duration=0.1)
 
 def main():
-    src = cv2.imread('img_small.jpg', cv2.IMREAD_UNCHANGED)
+	args = parser.parse_args()
+	print args.input, args.output
+	return
+    src = cv2.imread(args.input, cv2.IMREAD_UNCHANGED)
     frames = sliceAndAlignImages(src, 4)
-    outputToGif('out.gif', frames)
+    outputToGif(args.output, frames)
     cv2.destroyAllWindows()
 
 

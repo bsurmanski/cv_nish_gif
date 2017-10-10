@@ -12,7 +12,7 @@ parser.add_argument('--output', '-o',
 					default='out.gif',
 					help='output gif file')
 parser.add_argument('--height', '-y',
-					default=800, type=int,
+					default=1400, type=int,
 					help='scaled height of the output image.')
 parser.add_argument('--num_frames', '-n',
 					default=4, type=int,
@@ -81,12 +81,14 @@ def capture_focus(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONUP:
             POI = [x, y]
 
+            
 def sliceFrames(src_frame, num_images):
     w, h = src_frame.width, src_frame.height
     frames = [Frame(src_frame.img[0:h, i*w/4:(i+1)*w/4])
               for i in range(0, 4)]
     return frames
 
+    
 def alignFrames(frames, warp_mode=cv2.MOTION_TRANSLATION):
     poi_frame = POI_frame_index(sum([f.scaled_w for f in frames]), len(frames))
     ret = []
@@ -99,7 +101,7 @@ def alignFrames(frames, warp_mode=cv2.MOTION_TRANSLATION):
         ref = frames[poi_frame]
         cv2.findTransformECC(ref.gray(), frames[i].gray(), warp_matrix, warp_mode)
         aligned = cv2.warpAffine(frames[i].img, warp_matrix, (ref.width, ref.height),
-                                 flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP)
+                                 flags=cv2.INTER_CUBIC + cv2.WARP_INVERSE_MAP)
         ret.append(Frame(aligned))
 
     return ret
@@ -151,6 +153,7 @@ def outputToGif(filename, frames, boomerang=True):
     imageio.mimsave(filename, [f.img[...,::-1] for f in frames],
                     duration=0.1)
 
+                    
 def main():
   args = parser.parse_args()
   src = cv2.imread(args.input, cv2.IMREAD_UNCHANGED)

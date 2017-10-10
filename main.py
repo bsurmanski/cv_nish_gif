@@ -41,19 +41,38 @@ class Frame:
     def compute(self, algo):
         self.kp, self.des = algo.detectAndCompute(self.scaled, None)
 
-    def cropBorder(self):
-        return self.img
-        pass
+    def findCrop(self):
+        """
         gray = cv2.cvtColor(self.img,cv2.COLOR_BGR2GRAY)
         _,thresh = cv2.threshold(gray,1,255,cv2.THRESH_BINARY)
+        cv2.imshow('thresh', thresh)
+        cv2.waitKey(0)
         _,contours,hierarchy = cv2.findContours(thresh,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
         cnt = contours[0]
-        x,y,w,h = cv2.boundingRect(cnt)
-        return self.img[y:y+h,x:x+w]
+        rect = cv2.boundingRect(cnt)
+        """
+        hborder, vborder = 0.05, 0.01
+        rect = (int(self.width * hborder), int(self.height * vborder),
+                int(self.width * (1 - 2 * hborder)), int(self.height * (1 - 2 * vborder)))
+        return rect
+
+    def crop(self, rect):
+        x,y,w,h = rect
+        return Frame(self.img[y:y+h,x:x+w])
+
+
+def CommonCrop(rects):
+    x,y,w,h = rects[0]
+    x2, y2 = x + w, y + h
+    for rect in rects:
+        x = max(x, rect[0])
+        y = max(x, rect[1])
+        x2 = min(x2, rect[0] + rect[2])
+        x2 = min(x2, rect[1] + rect[3])
+    return x, y, x2-x, y2-y
 
 
 def POI_frame_index(width, num_images):
-    print "POI ", POI[0], float(width), num_images
     return int((POI[0] / float(width)) * num_images)
 
 
@@ -115,7 +134,12 @@ def sliceAndAlignImages(src, num_images):
     frames = sliceFrames(src_frame, num_images)
     aligned = alignFrames(frames)
 
-    return aligned
+    bounding_rects = [a.findCrop() for a in aligned]
+    crop_rect = CommonCrop(bounding_rects)
+    print 'crop', crop_rect
+
+    #return aligned
+    return [a.crop(crop_rect) for a in aligned]
 
 
 def outputToGif(filename, frames, boomerang=True):
@@ -124,7 +148,7 @@ def outputToGif(filename, frames, boomerang=True):
         rev.reverse()
         frames = frames[:] + rev
     # weird index converts from BGR to RGB
-    imageio.mimsave(filename, [f.cropBorder()[...,::-1] for f in frames],
+    imageio.mimsave(filename, [f.img[...,::-1] for f in frames],
                     duration=0.1)
 
 def main():

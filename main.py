@@ -33,7 +33,7 @@ class Frame:
                                  None, interpolation=cv2.INTER_CUBIC)
         self.scaled_h, self.scaled_w, = self.scaled.shape[:2]
 
-    def gray(self):
+    def getGray(self):
         if self._gray is None:
             self._gray = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
         return self._gray
@@ -59,6 +59,19 @@ class Frame:
     def crop(self, rect):
         x,y,w,h = rect
         return Frame(self.img[y:y+h,x:x+w])
+        
+    def POI_frame_index(self, num_frames):
+      return int((POI[0] / float(self.width)) * num_frames)
+    
+    def POI_frame_offset(self, num_frames, edge_padding=32):
+      clamp = lambda low, x, high: max(low, min(x, high))
+      x = clamp(edge_padding,
+                POI[0] - (self.POI_frame_index(num_frames) * num_frames),
+                int(self.width / num_frames) - edge_padding)
+      y = clamp(edge_padding,
+                POI[1],
+                self.height - edge_padding)
+      return x, y
 
 
 def CommonCrop(rects):
@@ -70,10 +83,6 @@ def CommonCrop(rects):
         x2 = min(x2, rect[0] + rect[2])
         x2 = min(x2, rect[1] + rect[3])
     return x, y, x2-x, y2-y
-
-
-def POI_frame_index(width, num_images):
-    return int((POI[0] / float(width)) * num_images)
 
 
 def capture_focus(event, x, y, flags, param):
@@ -89,8 +98,7 @@ def sliceFrames(src_frame, num_images):
     return frames
 
     
-def alignFrames(frames, warp_mode=cv2.MOTION_TRANSLATION):
-    poi_frame = POI_frame_index(sum([f.scaled_w for f in frames]), len(frames))
+def alignFrames(frames, poi_frame, poi_offset, poi_stride, warp_mode=cv2.MOTION_TRANSLATION):
     ret = []
     for i in range(len(frames)):
         print("align ", i)
@@ -99,7 +107,7 @@ def alignFrames(frames, warp_mode=cv2.MOTION_TRANSLATION):
             ret.append(frames[i])
             continue
         ref = frames[poi_frame]
-        cv2.findTransformECC(ref.gray(), frames[i].gray(), warp_matrix, warp_mode)
+        cv2.findTransformECC(ref.getGray(), frames[i].getGray(), warp_matrix, warp_mode)
         aligned = cv2.warpAffine(frames[i].img, warp_matrix, (ref.width, ref.height),
                                  flags=cv2.INTER_CUBIC + cv2.WARP_INVERSE_MAP)
         ret.append(Frame(aligned))
@@ -107,7 +115,7 @@ def alignFrames(frames, warp_mode=cv2.MOTION_TRANSLATION):
     return ret
 
 
-def sliceAndAlignImages(src, num_images):
+def sliceAndAlignImages(src, num_frames):
     global POI
 
     src_frame = Frame(src)
@@ -119,7 +127,7 @@ def sliceAndAlignImages(src, num_images):
         img = src_frame.scaled.copy()
 
         # draw sample slice lines
-        for i in range(1, num_images):
+        for i in range(1, num_frames):
             cv2.line(img, (i*src_frame.scaled_w/4, 0),
                      (i*src_frame.scaled_w/4, src_frame.scaled_h),
                      (0, 0, 255))
@@ -133,8 +141,11 @@ def sliceAndAlignImages(src, num_images):
         if key == ord('c'):
             break
 
-    frames = sliceFrames(src_frame, num_images)
-    aligned = alignFrames(frames)
+    poi_stride = 64
+    poi_frame = src_frame.POI_frame_index(num_frames)
+    poi_offset = src_frame.POI_frame_offset(num_frames, padding=int(poi_stride/2))
+    frames = sliceFrames(src_frame, num_frames)
+    aligned = alignFrames(frames, poi_frame, poi_offset, poi_stride)
 
     bounding_rects = [a.findCrop() for a in aligned]
     crop_rect = CommonCrop(bounding_rects)

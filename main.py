@@ -27,30 +27,23 @@ class Frame:
     def __init__(self, img):
         self.img = img
         self._gray = None
+        self._scaled = None
         self.height, self.width = img.shape[:2]
         self.scale = 400.0 / self.height
-        self.scaled = cv2.resize(self.img, (int(self.width * self.scale), 400),
+        self.scaled_h, self.scaled_w, = int(self.height * self.scale), int(self.width * self.scale)
+        
+    def getScaled(self):
+      if self._scaled is None:
+        self._scaled = cv2.resize(self.img, (int(self.width * self.scale), 400),
                                  None, interpolation=cv2.INTER_CUBIC)
-        self.scaled_h, self.scaled_w, = self.scaled.shape[:2]
+      return self._scaled
 
     def getGray(self):
         if self._gray is None:
             self._gray = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
         return self._gray
 
-    def compute(self, algo):
-        self.kp, self.des = algo.detectAndCompute(self.scaled, None)
-
     def findCrop(self):
-        """
-        gray = cv2.cvtColor(self.img,cv2.COLOR_BGR2GRAY)
-        _,thresh = cv2.threshold(gray,1,255,cv2.THRESH_BINARY)
-        cv2.imshow('thresh', thresh)
-        cv2.waitKey(0)
-        _,contours,hierarchy = cv2.findContours(thresh,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-        cnt = contours[0]
-        rect = cv2.boundingRect(cnt)
-        """
         hborder, vborder = 0.05, 0.01
         rect = (int(self.width * hborder), int(self.height * vborder),
                 int(self.width * (1 - 2 * hborder)), int(self.height * (1 - 2 * vborder)))
@@ -61,17 +54,17 @@ class Frame:
         return Frame(self.img[y:y+h,x:x+w])
         
     def POI_frame_index(self, num_frames):
-      return int((POI[0] / float(self.width)) * num_frames)
+      return int((POI[0] / float(self.scaled_w)) * num_frames)
     
     def POI_frame_offset(self, num_frames, edge_padding=32):
       clamp = lambda low, x, high: max(low, min(x, high))
-      frame_width = int(self.width / num_frames)
+      frame_width = int(self.scaled_w / num_frames)
       x = clamp(edge_padding,
                 POI[0] - (self.POI_frame_index(num_frames) * frame_width),
-                frame_width - edge_padding)
+                frame_width - edge_padding) / self.scale
       y = clamp(edge_padding,
                 POI[1],
-                self.height - edge_padding)
+                self.height - edge_padding) / self.scale
       return int(x), int(y)
       
     def POI_location(self, num_frames, edge_padding=32):
@@ -106,8 +99,12 @@ def sliceFrames(src_frame, num_images):
     
 def alignFrames(frames, poi_frame, poi_offset, poi_stride, warp_mode=cv2.MOTION_TRANSLATION):
     ret = []
-    poi_img = frames[poi_frame].img[int(poi_offset[0]-poi_stride/2):poi_stride,
-                                    int(poi_offset[1]-poi_stride/2):poi_stride]
+    poi_img = frames[poi_frame].img[int(poi_offset[0]-poi_stride/2):int(poi_offset[0]+poi_stride/2),
+                                    int(poi_offset[1]-poi_stride/2):int(poi_offset[1]+poi_stride/2)]
+    templ_gray = cv2.cvtColor(poi_img, cv2.COLOR_BGR2GRAY)
+    cv2.imshow('aaa', templ_gray)
+    key = cv2.waitKey(0) & 0xFF
+    
     for i in range(len(frames)):
         print("align ", i)
         warp_matrix = np.eye(2, 3, dtype=np.float32)
@@ -115,6 +112,13 @@ def alignFrames(frames, poi_frame, poi_offset, poi_stride, warp_mode=cv2.MOTION_
             ret.append(frames[i])
             continue
         ref = frames[poi_frame]
+        res = cv2.matchTemplate(ref.getGray(), templ_gray, cv2.TM_CCOEFF_NORMED)
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+        
+        cv2.rectangle(ref.img, max_loc, (max_loc[0] + poi_stride, min_loc[1] + poi_stride), 255, 2)
+        cv2.imshow('i %d' % i, ref.img)
+        key = cv2.waitKey(0) & 0xFF
+        
         cv2.findTransformECC(ref.getGray(), frames[i].getGray(), warp_matrix, warp_mode)
         aligned = cv2.warpAffine(frames[i].img, warp_matrix, (ref.width, ref.height),
                                  flags=cv2.INTER_CUBIC + cv2.WARP_INVERSE_MAP)
@@ -131,34 +135,42 @@ def sliceAndAlignImages(src, num_frames):
     cv2.namedWindow('image')
     cv2.setMouseCallback('image', capture_focus)
 
-    POI_STRIDE = 64
+    POI_STRIDE = 32
     POI_STRIDE_SCALED = POI_STRIDE * src_frame.scale
     while True:
-        img = Frame(src_frame.scaled.copy())
+        img = Frame(src_frame.img.copy())
 
         # draw sample slice lines
         for i in range(1, num_frames):
-            cv2.line(img.img, (i*src_frame.scaled_w/4, 0),
-                     (i*src_frame.scaled_w/4, src_frame.scaled_h),
+            cv2.line(img.img, (i*src_frame.width/4, 0),
+                     (i*src_frame.width/4, src_frame.height),
                      (0, 0, 255))
 
         # draw POI
         if POI:
-            cv2.circle(img.img, (POI[0], POI[1]), radius=3, color=(0, 0, 255))
-            loc = img.POI_location(num_frames, edge_padding=POI_STRIDE_SCALED)
+            cv2.circle(img.img, (POI[0], POI[1]), radius=10, color=(0, 0, 255))
+            loc = img.POI_location(num_frames, edge_padding=POI_STRIDE)
             cv2.rectangle(img.img, 
-                          (loc[0] - int(POI_STRIDE_SCALED/2), loc[1] - int(POI_STRIDE_SCALED/2)),
-                          (loc[0] + int(POI_STRIDE_SCALED/2), loc[1] + int(POI_STRIDE_SCALED/2)), color = (0, 0, 255))
+                          (loc[0] - int(POI_STRIDE/2), loc[1] - int(POI_STRIDE/2)),
+                          (loc[0] + int(POI_STRIDE/2), loc[1] + int(POI_STRIDE/2)), color = (0, 0, 255))
             
 
-        cv2.imshow('image', img.img)
+        cv2.imshow('image', img.getScaled())
         key = cv2.waitKey(1) & 0xFF
         if key == ord('c'):
             break
 
     poi_frame = src_frame.POI_frame_index(num_frames)
+    print poi_frame
+    print "!!!"
     poi_offset = src_frame.POI_frame_offset(num_frames, edge_padding=POI_STRIDE)
     frames = sliceFrames(src_frame, num_frames)
+    cv2.rectangle(frames[poi_frame].img, 
+              (poi_offset[0] - int(POI_STRIDE/2), poi_offset[1] - int(POI_STRIDE/2)),
+              (poi_offset[0] + int(POI_STRIDE/2), poi_offset[1] + int(POI_STRIDE/2)), color = (0, 0, 255))
+    cv2.imshow('iiiuuiu', frames[poi_frame].img)
+    key = cv2.waitKey(0) & 0xFF
+
     aligned = alignFrames(frames, poi_frame, poi_offset, POI_STRIDE)
 
     bounding_rects = [a.findCrop() for a in aligned]

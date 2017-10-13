@@ -22,6 +22,7 @@ parser.add_argument('--boomerang', '-z',
 					help='Whether the gif should boomerang back-and-forth.')
 
 POI = []
+SCALE = 1
 
 class Frame:
     def __init__(self, img):
@@ -54,17 +55,17 @@ class Frame:
         return Frame(self.img[y:y+h,x:x+w])
         
     def POI_frame_index(self, num_frames):
-      return int((POI[0] / float(self.scaled_w)) * num_frames)
+      return int((POI[0] / float(self.width)) * num_frames)
     
     def POI_frame_offset(self, num_frames, edge_padding=32):
       clamp = lambda low, x, high: max(low, min(x, high))
-      frame_width = int(self.scaled_w / num_frames)
+      frame_width = int(self.width / num_frames)
       x = clamp(edge_padding,
                 POI[0] - (self.POI_frame_index(num_frames) * frame_width),
-                frame_width - edge_padding) / self.scale
+                frame_width - edge_padding)
       y = clamp(edge_padding,
                 POI[1],
-                self.height - edge_padding) / self.scale
+                self.height - edge_padding)
       return int(x), int(y)
       
     def POI_location(self, num_frames, edge_padding=32):
@@ -87,7 +88,7 @@ def CommonCrop(rects):
 def capture_focus(event, x, y, flags, param):
     global POI
     if event == cv2.EVENT_LBUTTONUP:
-            POI = [x, y]
+            POI = [int(x * SCALE), int(y * SCALE)]
 
             
 def sliceFrames(src_frame, num_images):
@@ -99,11 +100,10 @@ def sliceFrames(src_frame, num_images):
     
 def alignFrames(frames, poi_frame, poi_offset, poi_stride, warp_mode=cv2.MOTION_TRANSLATION):
     ret = []
-    poi_img = frames[poi_frame].img[int(poi_offset[0]-poi_stride/2):int(poi_offset[0]+poi_stride/2),
-                                    int(poi_offset[1]-poi_stride/2):int(poi_offset[1]+poi_stride/2)]
+    poi_top_left = int(poi_offset[0] - poi_stride/2), int(poi_offset[1] - poi_stride/2)
+    poi_img = frames[poi_frame].img[poi_top_left[1]:poi_top_left[1] + poi_stride,
+                                    poi_top_left[0]:poi_top_left[0] + poi_stride]
     templ_gray = cv2.cvtColor(poi_img, cv2.COLOR_BGR2GRAY)
-    cv2.imshow('aaa', templ_gray)
-    key = cv2.waitKey(0) & 0xFF
     
     for i in range(len(frames)):
         print("align ", i)
@@ -111,17 +111,12 @@ def alignFrames(frames, poi_frame, poi_offset, poi_stride, warp_mode=cv2.MOTION_
         if i == poi_frame:
             ret.append(frames[i])
             continue
-        ref = frames[poi_frame]
+        ref = frames[i]
         res = cv2.matchTemplate(ref.getGray(), templ_gray, cv2.TM_CCOEFF_NORMED)
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-        
-        cv2.rectangle(ref.img, max_loc, (max_loc[0] + poi_stride, min_loc[1] + poi_stride), 255, 2)
-        cv2.imshow('i %d' % i, ref.img)
-        key = cv2.waitKey(0) & 0xFF
-        
-        cv2.findTransformECC(ref.getGray(), frames[i].getGray(), warp_matrix, warp_mode)
-        aligned = cv2.warpAffine(frames[i].img, warp_matrix, (ref.width, ref.height),
-                                 flags=cv2.INTER_CUBIC + cv2.WARP_INVERSE_MAP)
+        M = np.float32([[1,0,poi_top_left[0] - max_loc[0]],
+                        [0,1,poi_top_left[1] - max_loc[1]]])
+        aligned = cv2.warpAffine(frames[i].img, M, (ref.width, ref.height))
         ret.append(Frame(aligned))
 
     return ret
@@ -129,14 +124,15 @@ def alignFrames(frames, poi_frame, poi_offset, poi_stride, warp_mode=cv2.MOTION_
 
 def sliceAndAlignImages(src, num_frames):
     global POI
+    global SCALE
 
     src_frame = Frame(src)
 
     cv2.namedWindow('image')
     cv2.setMouseCallback('image', capture_focus)
 
-    POI_STRIDE = 32
-    POI_STRIDE_SCALED = POI_STRIDE * src_frame.scale
+    POI_STRIDE = 64
+    SCALE = 1 / src_frame.scale
     while True:
         img = Frame(src_frame.img.copy())
 
@@ -161,15 +157,11 @@ def sliceAndAlignImages(src, num_frames):
             break
 
     poi_frame = src_frame.POI_frame_index(num_frames)
-    print poi_frame
-    print "!!!"
     poi_offset = src_frame.POI_frame_offset(num_frames, edge_padding=POI_STRIDE)
     frames = sliceFrames(src_frame, num_frames)
     cv2.rectangle(frames[poi_frame].img, 
               (poi_offset[0] - int(POI_STRIDE/2), poi_offset[1] - int(POI_STRIDE/2)),
               (poi_offset[0] + int(POI_STRIDE/2), poi_offset[1] + int(POI_STRIDE/2)), color = (0, 0, 255))
-    cv2.imshow('iiiuuiu', frames[poi_frame].img)
-    key = cv2.waitKey(0) & 0xFF
 
     aligned = alignFrames(frames, poi_frame, poi_offset, POI_STRIDE)
 
@@ -192,6 +184,7 @@ def outputToGif(filename, frames, boomerang=True):
 
                     
 def main():
+  global SCALE
   args = parser.parse_args()
   src = cv2.imread(args.input, cv2.IMREAD_UNCHANGED)
   h, w = src.shape[0:2]

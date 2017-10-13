@@ -148,7 +148,8 @@ def sliceAndAlignImages(src, num_frames):
             loc = img.POI_location(num_frames, edge_padding=POI_STRIDE)
             cv2.rectangle(img.img, 
                           (loc[0] - int(POI_STRIDE/2), loc[1] - int(POI_STRIDE/2)),
-                          (loc[0] + int(POI_STRIDE/2), loc[1] + int(POI_STRIDE/2)), color = (0, 0, 255))
+                          (loc[0] + int(POI_STRIDE/2), loc[1] + int(POI_STRIDE/2)), color = (0, 0, 255),
+                          thickness=4)
             
 
         cv2.imshow('image', img.getScaled())
@@ -159,10 +160,6 @@ def sliceAndAlignImages(src, num_frames):
     poi_frame = src_frame.POI_frame_index(num_frames)
     poi_offset = src_frame.POI_frame_offset(num_frames, edge_padding=POI_STRIDE)
     frames = sliceFrames(src_frame, num_frames)
-    cv2.rectangle(frames[poi_frame].img, 
-              (poi_offset[0] - int(POI_STRIDE/2), poi_offset[1] - int(POI_STRIDE/2)),
-              (poi_offset[0] + int(POI_STRIDE/2), poi_offset[1] + int(POI_STRIDE/2)), color = (0, 0, 255))
-
     aligned = alignFrames(frames, poi_frame, poi_offset, POI_STRIDE)
 
     bounding_rects = [a.findCrop() for a in aligned]

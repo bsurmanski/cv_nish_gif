@@ -8,15 +8,17 @@ parser = argparse.ArgumentParser(description='process Nishika Photos')
 parser.add_argument('--input', '-i',
           nargs='+',
 					help='input file containing Nishika pictures')
+parser.add_argument('--pattern', '-p',
+					help='input files of pattern <myfilename>_i.jpg, from i between 1 and n')
 parser.add_argument('--output', '-o',
 					default='out.gif',
 					help='output gif file')
 parser.add_argument('--height', '-y',
 					default=1400, type=int,
 					help='scaled height of the output image.')
-parser.add_argument('--split', '-n',
+parser.add_argument('--frames', '-n',
 					default=0, type=int,
-					help='Number of frames in the Nishika picture.')
+					help='Number of frames in the Nishika picture. If len(input) == 1, and frames > 1, then the input image will be split.')
 parser.add_argument('--boomerang', '-z',
 					default=True, type=bool,
 					help='Whether the gif should boomerang back-and-forth.')
@@ -202,14 +204,17 @@ def outputToGif(filename, frames, boomerang=True):
 def main():
   global SCALE
   args = parser.parse_args()
-  print args.input
-  if args.split > 0:
-    if len(args.input) > 1:
-      raise Exception("can only use --split with a single --input")
-    src = cv2.imread(args.input[0], cv2.IMREAD_UNCHANGED)
-    frames = sliceFrames(Frame(src), args.split)
+  inputs = args.input
+  
+  if args.pattern:
+    inputs = [args.pattern + '_' + str(i) + '.jpg' for i in range(1, args.frames + 1)]
+  
+  # split an image if only one passed in
+  if len(inputs) == 1 and args.frames > 0:
+    src = cv2.imread(inputs[0], cv2.IMREAD_UNCHANGED)
+    frames = sliceFrames(Frame(src), args.frames)
   else:
-    frames = [Frame(cv2.imread(f, cv2.IMREAD_UNCHANGED)) for f in args.input]
+    frames = [Frame(cv2.imread(f, cv2.IMREAD_UNCHANGED)) for f in inputs]
   
   h, w = frames[0].height, frames[0].width
   target_height = args.height or h

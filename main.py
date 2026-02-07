@@ -25,6 +25,7 @@ parser.add_argument('--boomerang', '-z',
 
 POI_frame_index = 0
 POI_frame_offset = [0,0]
+POI = None
 
 class Frame:
   def __init__(self, img):

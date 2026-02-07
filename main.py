@@ -28,6 +28,8 @@ POI_frame_offset = [0,0]
 
 class Frame:
   def __init__(self, img):
+    if img is None:
+      raise ValueError('Frame initialized with None image. Is the filename correct?')
     self.img = img
     self._gray = None
     self._scaled = None

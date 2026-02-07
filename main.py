@@ -81,15 +81,15 @@ def CommonCrop(rects):
   x2, y2 = x + w, y + h
   for rect in rects:
     x = max(x, rect[0])
-    y = max(x, rect[1])
+    y = max(y, rect[1])
     x2 = min(x2, rect[0] + rect[2])
-    x2 = min(x2, rect[1] + rect[3])
+    y2 = min(y2, rect[1] + rect[3])
   return x, y, x2-x, y2-y
 
             
 def sliceFrames(src_frame, num_images):
   w, h = src_frame.width, src_frame.height
-  frames = [Frame(src_frame.img[0:h, i*w/4:(i+1)*w/4])
+  frames = [Frame(src_frame.img[0:h, i*w//4:(i+1)*w//4])
             for i in range(0, 4)]
   return frames
 
@@ -165,13 +165,13 @@ def getPOIInput(frames):
     key = cv2.waitKey(1) & 0xFF
     if key == ord('c'):
       break
-      
+  cv2.destroyAllWindows()  
 
   # find frame and offset in frame of Point Of Interest
   POI_acc = 0
   for i in range(0, len(frames)):
     if POI_acc + frames[i].width >= POI[0]:
-      print POI[0]
+      print(POI[0])
       POI_frame_index = i
       POI_location = [POI[0] - POI_acc, POI[1]]
       break
@@ -185,7 +185,7 @@ def alignImages(frames, poi_frame_index, poi_offset):
 
     bounding_rects = [a.findCrop() for a in aligned]
     crop_rect = CommonCrop(bounding_rects)
-    print 'crop', crop_rect
+    print('crop ' + str(crop_rect))
 
     #return aligned
     return [a.crop(crop_rect) for a in aligned]

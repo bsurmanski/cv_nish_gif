@@ -25,6 +25,13 @@ pip install opencv-python numpy imageio
 
   * `imageio`: Used to create the final GIF file from the processed frames.
 
+### Using a venv
+Alternatively, dependencies have been saved to requirements.txt and this can all be done with a python venv.
+
+* `python -m venv venv`
+* `source venv/bin/activate`
+* `./venv/bin/pip3 install -r requirements.txt`
+
 ## Usage
 
 The script is run from the command line and requires an input image file and an output filename.
@@ -37,13 +44,16 @@ To create a GIF with default settings, simply specify the input image and the de
 python main.py --frames 4 --input path/to/your/scan.jpg --output output.gif
 ```
 
-or if you have 4 images named scan_1.jpg, scan_2.jpg, scan_3.jpg, scan_4.jpg
+or if you have 4 images named myscan_1.jpg, myscan_2.jpg, myscan_3.jpg, myscan_4.jpg
 
 ```
-python main.py --frames 4 --pattern path/to/your/scan --output output.gif
+python main.py --frames 4 --pattern path/to/your/myscan --output output.gif
 ```
+(note the pattern does not include the number or file extension)
 
 This will pop up a preview window, where you may select the point of interest.
+
+Once a point of interest is selected, *press the 'c' key* to close the window and generate a GIF.
 
 ### Options
 

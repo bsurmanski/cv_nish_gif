@@ -37,14 +37,13 @@ Alternatively, dependencies have been saved to requirements.txt and this can all
 The script is run from the command line and requires an input image file and an output filename.
 
 ### Basic Usage
-
-To create a GIF with default settings, simply specify the input image and the desired output file.
+If you have a single image with all 4 frames side by side you may run:
 
 ```
 python main.py --frames 4 --input path/to/your/scan.jpg --output output.gif
 ```
 
-or if you have 4 images named myscan_1.jpg, myscan_2.jpg, myscan_3.jpg, myscan_4.jpg
+or if you have 4 images named myscan_1.jpg, myscan_2.jpg, myscan_3.jpg, myscan_4.jpg for each frame of the Nishika animation:
 
 ```
 python main.py --frames 4 --pattern path/to/your/myscan --output output.gif
